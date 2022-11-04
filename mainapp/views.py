@@ -1,3 +1,5 @@
+from threading import Thread
+import queue
 from django.shortcuts import render
 from yahoo_fin.stock_info import tickers_nifty50, get_quote_table
 
@@ -28,9 +30,24 @@ def stocktracker(request):
     errorStocksString: str = ", ".join(errorStocks)
 
     data: dict = {}
-    for i in correctStocks:
-        # breakpoint()
-        data.update({i: get_quote_table(i)})
+
+    thread_list: list = []
+    result: list = []
+    que: queue.Queue = queue.Queue()
+
+    for i, stock in enumerate(correctStocks):
+        thread = Thread(target=lambda q, arg1: q.put(get_quote_table(stock)), args=(que, stock))
+        thread_list.append(thread)
+        thread_list[i].start()
+
+    for thread in thread_list:
+        thread.join()
+
+    while not que.empty():
+        result = que.get()
+        data.update(result)
+                
+    print("Data fetched successfully")
 
     return render(
         request=request,
